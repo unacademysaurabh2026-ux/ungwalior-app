@@ -411,3 +411,14 @@ tr:hover td{background:#f8fafc;}
 }
 .eye-btn:hover{color:var(--blue);}
 .topnav-left{display:flex;align-items:center;gap:10px;}
+
+/* ── INSTALL APP BUTTON ── */
+.install-btn{
+  background:linear-gradient(135deg,#1a56db,#1e429f);
+  color:#fff;border:none;padding:6px 14px;border-radius:20px;
+  font-size:12px;font-weight:700;cursor:pointer;
+  font-family:'Sora',sans-serif;transition:all 0.2s;
+  display:inline-flex;align-items:center;gap:5px;
+  box-shadow:0 2px 8px rgba(26,86,219,0.3);
+}
+.install-btn:hover{box-shadow:0 4px 16px rgba(26,86,219,0.45);transform:translateY(-1px);}

@@ -585,7 +585,6 @@ function students() {
       <div class="student-cards" id="sCards">${studentMobileCards(STATE.students)}</div>
     </div>
   `);
-  window._ss = STATE.students;
 }
 
 function studentRows(list) {
@@ -627,10 +626,12 @@ function studentMobileCards(list) {
 }
 
 function filterStudents(q) {
-  const f = (window._ss||STATE.students).filter(s=>
-    s.name.toLowerCase().includes(q.toLowerCase()) ||
-    s.email.toLowerCase().includes(q.toLowerCase())
-  );
+  const query = (q||'').toLowerCase().trim();
+  const f = query
+    ? STATE.students.filter(s =>
+        s.name.toLowerCase().includes(query) ||
+        s.email.toLowerCase().includes(query))
+    : STATE.students;
   const tbody = document.getElementById('sTbody');
   const cards = document.getElementById('sCards');
   if (tbody) tbody.innerHTML = studentRows(f);
@@ -646,13 +647,11 @@ async function addStudent() {
   if (STATE.students.some(s=>s.email===email)) { toast('Email already registered', 'e'); return; }
   const newS = { id:uid(), name, email, batchId, active:'true', password };
   STATE.students.push(newS);
-  window._ss = STATE.students;
   document.getElementById('sName').value = '';
   document.getElementById('sEmail').value = '';
   document.getElementById('sPassword').value = '';
-  document.getElementById('sTbody').innerHTML = studentRows(STATE.students);
-  document.getElementById('sCards').innerHTML = studentMobileCards(STATE.students);
-  toast(`${name} added!`, 's');
+  filterStudents('');
+  toast(`${name} added! ✅`, 's');
   await writeToSheet('addStudent', newS);
 }
 
@@ -670,7 +669,6 @@ async function toggleStudent(id) {
   STATE.activeOverrides[id] = s.active;
   try { localStorage.setItem('activeOverrides', JSON.stringify(STATE.activeOverrides)); } catch(e) {}
 
-  window._ss = STATE.students;
 
   // ── Kill the student's session if they are currently logged in ──
   try {
@@ -688,14 +686,13 @@ async function toggleStudent(id) {
     }
   } catch(e) {}
 
-  // Refresh admin table
-  const tbody = document.getElementById('sTbody');
-  const cards = document.getElementById('sCards');
-  if (tbody) tbody.innerHTML = studentRows(STATE.students);
-  if (cards) cards.innerHTML = studentMobileCards(STATE.students);
+  // Refresh table — re-apply any active search filter
+  const searchEl = document.querySelector('.search-box');
+  const q = searchEl ? searchEl.value : '';
+  filterStudents(q);
   toast(`${s.name} ${nowActive ? 'activated ✅' : 'deactivated 🔒'}`);
 
-  // Also send to sheet (best-effort, no-cors so may be slow)
+  // Send to sheet (best-effort)
   await writeToSheet('toggleStudent', { id, active: s.active });
 }
 
@@ -707,11 +704,7 @@ async function trashStudent(id) {
   // Clear any stored override for this student
   delete STATE.activeOverrides[id];
   try { localStorage.setItem('activeOverrides', JSON.stringify(STATE.activeOverrides)); } catch(e) {}
-  window._ss = STATE.students;
-  const tbody = document.getElementById('sTbody');
-  const cards = document.getElementById('sCards');
-  if (tbody) tbody.innerHTML = studentRows(STATE.students);
-  if (cards) cards.innerHTML = studentMobileCards(STATE.students);
+  filterStudents('');
   toast('Moved to Recycle Bin 🗑️');
   await writeToSheet('deleteStudent', { id });
 }
@@ -786,7 +779,6 @@ async function saveStudentEdit(id) {
     }
   } catch(e) {}
 
-  window._ss = STATE.students;
   toast(`${name} updated! ✅`, 's');
   await writeToSheet('updateStudent', s);
   students();
@@ -1031,6 +1023,42 @@ function permDeleteLecture(id) {
   if (!confirm('Permanently delete? Cannot be undone.')) return;
   STATE.trash.lectures = STATE.trash.lectures.filter(l=>l.id!==id);
   toast('Permanently deleted'); recycleBin();
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║              PWA — INSTALL AS DESKTOP APP               ║
+// ╚══════════════════════════════════════════════════════════╝
+let _pwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  // Show install button in nav
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.classList.add('hidden');
+  _pwaPrompt = null;
+  toast('App installed successfully! 🎉', 's');
+});
+
+async function installApp() {
+  if (_pwaPrompt) {
+    _pwaPrompt.prompt();
+    const { outcome } = await _pwaPrompt.userChoice;
+    if (outcome === 'accepted') {
+      _pwaPrompt = null;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.classList.add('hidden');
+    }
+  } else {
+    // Fallback: show instructions
+    toast('Open browser menu → "Add to Home Screen" or "Install App"', 'i');
+  }
 }
 
 // ── Boot ──
