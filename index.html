@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Unacademy Gwalior — Portal</title>
 <link rel="icon" href="logo.png">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#1a56db">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="UA Gwalior">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -92,9 +92,7 @@
     <div class="topnav-right">
       <span class="nav-user" id="navName"></span>
       <span class="nav-pill" id="navPill"></span>
-      <button class="install-btn hidden" id="installBtn" onclick="installApp()" title="Install as App">
-        ⬇️ Install App
-      </button>
+      <button class="install-btn" id="installBtn" onclick="handleInstallClick()" style="display:none;" title="Install App">⬇️ Install</button>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </nav>
@@ -119,12 +117,5 @@
 </div>
 
 <script src="app.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
-    });
-  }
-</script>
 </body>
 </html>
