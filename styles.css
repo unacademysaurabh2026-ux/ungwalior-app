@@ -129,13 +129,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-he
   cursor:pointer;font-family:'Sora',sans-serif;transition:all 0.2s;
 }
 .logout-btn:hover{border-color:var(--red);color:var(--red);}
-.install-btn{
-  background:var(--blue-g);color:#fff;border:none;
-  padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;
-  cursor:pointer;font-family:'Sora',sans-serif;transition:all 0.2s;
-  display:inline-flex;align-items:center;gap:5px;
-}
-.install-btn:hover{box-shadow:0 4px 14px rgba(26,86,219,0.35);transform:translateY(-1px);}
 
 /* Hamburger */
 .hamburger{

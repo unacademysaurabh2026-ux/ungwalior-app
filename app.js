@@ -222,6 +222,8 @@ async function studentLogin() {
 
   try {
     await loadAllData();
+
+    // First find student by email in CSV (for name/batchId)
     const student = STATE.students.find(s => s.email.toLowerCase() === emailVal);
 
     if (!student) {
@@ -232,7 +234,12 @@ async function studentLogin() {
       toast('Incorrect password', 'e');
       btn.disabled = false; btn.textContent = 'Login →'; return;
     }
-    if (!isActive(student)) {
+
+    // ── Check active status via Apps Script (live sheet, not cached CSV) ──
+    // The published CSV can be stale for minutes after admin deactivates a student.
+    // Apps Script reads the sheet directly so it's always up to date.
+    const liveCheck = await fetchLiveStudentStatus(student.id, password);
+    if (!liveCheck.active) {
       toast('Your account is inactive. Contact admin.', 'e');
       btn.disabled = false; btn.textContent = 'Login →'; return;
     }
@@ -244,6 +251,32 @@ async function studentLogin() {
   } catch(err) {
     toast('Login failed. Try again.', 'e');
     btn.disabled = false; btn.textContent = 'Login →';
+  }
+}
+
+// Calls Apps Script loginStudent which reads LIVE sheet data (not cached CSV)
+async function fetchLiveStudentStatus(id, password) {
+  if (usingDemo()) return { active: true };
+  try {
+    const blob = new Blob(
+      [JSON.stringify({ action: 'loginStudent', id, password })],
+      { type: 'text/plain' }
+    );
+    // sendBeacon is fire-and-forget so we can't use it here.
+    // For login we need the response — use fetch with no-cors fallback.
+    // Since we need to READ the response, we try cors first.
+    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'loginStudent', id, password }),
+    });
+    const data = await resp.json();
+    return { active: data.success === true };
+  } catch(e) {
+    // If cors fails (e.g. network), fall back to CSV active value
+    const student = STATE.students.find(s => String(s.id) === String(id));
+    return { active: student ? isActive(student) : false };
   }
 }
 
@@ -599,6 +632,7 @@ function studentRows(list) {
     <td><span class="badge ${isActive(s)?'badge-green':'badge-red'}">${isActive(s)?'Active':'Inactive'}</span></td>
     <td class="td-actions">
       <button class="btn btn-ghost btn-sm" onclick="editStudent('${s.id}')">✏️ Edit</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleStudent('${s.id}')">${isActive(s)?'Deactivate':'Activate'}</button>
       <button class="btn-trash" title="Move to Recycle Bin" onclick="trashStudent('${s.id}')">🗑️</button>
     </td>
   </tr>`).join('');
@@ -619,6 +653,7 @@ function studentMobileCards(list) {
       </div>
       <div class="sc-actions">
         <button class="btn btn-ghost btn-sm" onclick="editStudent('${s.id}')">✏️ Edit</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleStudent('${s.id}')">${isActive(s)?'Deactivate':'Activate'}</button>
         <button class="btn-trash" onclick="trashStudent('${s.id}')">🗑️</button>
       </div>
     </div>`).join('');
@@ -1033,51 +1068,6 @@ function permDeleteLecture(id) {
 
 // ── Boot ──
 window.addEventListener('load', checkStoredLogin);
-
-// ╔══════════════════════════════════════════════════════════╗
-// ║               PWA INSTALL PROMPT                        ║
-// ╚══════════════════════════════════════════════════════════╝
-let _installPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  _installPrompt = e;
-  const btn = document.getElementById('installBtn');
-  if (btn) btn.style.display = 'flex';
-});
-
-window.addEventListener('appinstalled', () => {
-  _installPrompt = null;
-  const btn = document.getElementById('installBtn');
-  if (btn) btn.style.display = 'none';
-  toast('✅ App installed successfully!', 's');
-});
-
-async function handleInstallClick() {
-  if (_installPrompt) {
-    // Native browser install prompt available (Chrome/Edge on Android & Desktop)
-    _installPrompt.prompt();
-    const { outcome } = await _installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      _installPrompt = null;
-      const btn = document.getElementById('installBtn');
-      if (btn) btn.style.display = 'none';
-    }
-  } else {
-    // Fallback: show manual instructions
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isChrome = /chrome/i.test(navigator.userAgent) && !/edge/i.test(navigator.userAgent);
-    let msg = '';
-    if (isIOS) {
-      msg = '📱 On iPhone/iPad:\nTap the Share button (□↑) at the bottom of Safari → "Add to Home Screen"';
-    } else if (isChrome) {
-      msg = '💻 In Chrome:\nClick the 3-dot menu (⋮) at top-right → "Save and share" → "Install page as app"\n\nOr look for the ⬇️ install icon in the address bar.';
-    } else {
-      msg = '🌐 To install:\nOpen this site in Chrome or Edge → click the menu → "Install app" or "Add to Home Screen"';
-    }
-    alert(msg);
-  }
-}
 
 // ── Password eye toggle ──
 function toggleEye(inputId, btnId) {
