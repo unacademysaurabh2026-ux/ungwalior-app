@@ -11,7 +11,7 @@ const CONFIG = {
     batches  : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQublwdN0HHaxdwKk0VrQ_UFPP9r9q1MRuNLo-KFMnQ5WSWJskjO4i9J6iWk8UPVasuPZ9g1zaAMlWc/pub?gid=0&single=true&output=csv',
     lectures : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQublwdN0HHaxdwKk0VrQ_UFPP9r9q1MRuNLo-KFMnQ5WSWJskjO4i9J6iWk8UPVasuPZ9g1zaAMlWc/pub?gid=1542279364&single=true&output=csv',
   },
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwEJ1FbumZHTUak2dIsJmzBKawGjc8-rsqP-yyT-tpVmPilByhAj9aDmSaGwzndbDbl/exec',
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzeCqj-sFk9uqHksFwk0cjEbsDI8jEQutom0fnhd1hwBLXwoRCPGs6XOjCFwJur-6k/exec',
   ADMIN: {
     email    : 'admin@unacademygwalior.com',
     password : 'Admin@123',
