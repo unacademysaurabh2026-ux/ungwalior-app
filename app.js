@@ -6,12 +6,6 @@
 // ║          ⚙️  CONFIGURATION — EDIT THESE ONLY            ║
 // ╚══════════════════════════════════════════════════════════╝
 const CONFIG = {
-  SHEETS: {
-    students : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQublwdN0HHaxdwKk0VrQ_UFPP9r9q1MRuNLo-KFMnQ5WSWJskjO4i9J6iWk8UPVasuPZ9g1zaAMlWc/pub?gid=735248222&single=true&output=csv',
-    batches  : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQublwdN0HHaxdwKk0VrQ_UFPP9r9q1MRuNLo-KFMnQ5WSWJskjO4i9J6iWk8UPVasuPZ9g1zaAMlWc/pub?gid=0&single=true&output=csv',
-    lectures : 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQublwdN0HHaxdwKk0VrQ_UFPP9r9q1MRuNLo-KFMnQ5WSWJskjO4i9J6iWk8UPVasuPZ9g1zaAMlWc/pub?gid=1542279364&single=true&output=csv',
-  },
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzZ654bXsntnX9KZId0NHEXBCNZRYeKjnhzeGjYpT0Wq3Ju00mAWjrQ-YAMBALTOwOuNw/exec',
   ADMIN: {
     email    : 'admin@unacademygwalior.com',
     password : 'Admin@123',
@@ -58,8 +52,7 @@ const DEMO = {
   ],
 };
 
-const usingDemo = () =>
-  CONFIG.SHEETS.students.startsWith('YOUR') || CONFIG.SHEETS.students === '';
+const usingDemo = () => false; // data.js is always the source
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║              HELPERS                                    ║
@@ -128,63 +121,16 @@ async function fetchSheet(url) {
 }
 
 async function loadAllData() {
-  if (usingDemo()) {
-    STATE.batches  = DEMO.batches;
-    STATE.students = DEMO.students;
-    STATE.lectures = DEMO.lectures;
-    return;
-  }
-  const [b, s, l] = await Promise.all([
-    fetchSheet(CONFIG.SHEETS.batches),
-    fetchSheet(CONFIG.SHEETS.students),
-    fetchSheet(CONFIG.SHEETS.lectures),
-  ]);
-  STATE.batches  = b;
-  STATE.lectures = l;
-
-  // Load saved active overrides (admin changes that may not have synced to sheet yet)
-  try {
-    const saved = localStorage.getItem('activeOverrides');
-    if (saved) STATE.activeOverrides = JSON.parse(saved);
-  } catch(e) { STATE.activeOverrides = {}; }
-
-  // Apply overrides on top of sheet data
-  STATE.students = s.map(student => {
-    if (student.id in STATE.activeOverrides) {
-      return { ...student, active: STATE.activeOverrides[student.id] };
-    }
-    return student;
-  });
+  // Load from data.js (DB global) — always fresh, no network needed
+  STATE.batches  = (DB.batches  || []).map(b => ({...b}));
+  STATE.students = (DB.students || []).map(s => ({...s}));
+  STATE.lectures = (DB.lectures || []).map(l => ({...l}));
 }
 
+// writeToSheet is a no-op — data lives in data.js on GitHub
+// Use Admin Panel → "💾 Export data.js" to get updated file, then paste on GitHub
 async function writeToSheet(action, data) {
-  if (usingDemo()) return { success: true };
-  try {
-    // Use GET with URL params — works cross-origin, response is readable
-    // (no-cors POST is fire-and-forget and can't tell us if it failed)
-    const params = new URLSearchParams({ action, ...flattenForUrl(data) });
-    const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
-    const resp = await fetch(url, { method: 'GET' });
-    const result = await resp.json();
-    if (!result.success) {
-      console.error('Sheet write failed:', action, result);
-      toast('\u26a0\ufe0f Sheet sync error: ' + (result.error || 'unknown'), 'e');
-    }
-    return result;
-  } catch (e) {
-    console.error('writeToSheet error:', action, e);
-    toast('\u26a0\ufe0f Could not sync to Google Sheets. Check Apps Script.', 'e');
-    return { success: false };
-  }
-}
-
-// Flatten object values to strings for URL params
-function flattenForUrl(obj) {
-  const out = {};
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = (v === null || v === undefined) ? '' : String(v);
-  }
-  return out;
+  return { success: true };
 }
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -232,42 +178,26 @@ async function studentLogin() {
   if (!emailVal || !password) { toast('Enter email and password', 'e'); return; }
   btn.disabled = true; btn.textContent = 'Logging in...';
 
-  try {
-    // Use Apps Script GET for live login — bypasses stale published CSV entirely
-    const params = new URLSearchParams({ action: 'loginByEmail', email: emailVal, password });
-    const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+  await loadAllData();
+  const student = STATE.students.find(s => (s.email||'').toLowerCase() === emailVal);
 
-    let result;
-    try {
-      const resp = await fetch(url, { method: 'GET' });
-      result = await resp.json();
-    } catch(netErr) {
-      // Network error — fall back to CSV
-      console.warn('Apps Script unreachable, falling back to CSV:', netErr);
-      await loadAllData();
-      const s = STATE.students.find(st => (st.email||'').toLowerCase() === emailVal);
-      if (!s) result = { success: false, message: 'No account found with that email' };
-      else if (String(s.password).trim() !== password) result = { success: false, message: 'Incorrect password' };
-      else if (!isActive(s)) result = { success: false, message: 'Your account is inactive. Contact admin.' };
-      else result = { success: true, name: s.name, email: s.email, batchId: s.batchId };
-    }
-
-    if (!result.success) {
-      toast(result.message || 'Login failed', 'e');
-      btn.disabled = false; btn.textContent = 'Login →';
-      return;
-    }
-
-    await loadAllData();
-    STATE.user = { name: result.name, email: emailVal, role: 'student', batchId: result.batchId };
-    localStorage.setItem('userSession', JSON.stringify(STATE.user));
-    btn.disabled = false; btn.textContent = 'Login →';
-    launchApp();
-  } catch(err) {
-    console.error('Login error:', err);
-    toast('Login failed. Try again.', 'e');
-    btn.disabled = false; btn.textContent = 'Login →';
+  if (!student) {
+    toast('No account found with that email', 'e');
+    btn.disabled = false; btn.textContent = 'Login →'; return;
   }
+  if (String(student.password).trim() !== password) {
+    toast('Incorrect password', 'e');
+    btn.disabled = false; btn.textContent = 'Login →'; return;
+  }
+  if (!isActive(student)) {
+    toast('Your account is inactive. Contact admin.', 'e');
+    btn.disabled = false; btn.textContent = 'Login →'; return;
+  }
+
+  STATE.user = { name: student.name, email: emailVal, role: 'student', batchId: student.batchId };
+  localStorage.setItem('userSession', JSON.stringify(STATE.user));
+  btn.disabled = false; btn.textContent = 'Login →';
+  launchApp();
 }
 
 async function adminLogin() {
@@ -349,6 +279,7 @@ function buildSidebar() {
     { id:'lectures',   icon:'▶️', label:'Lectures'    },
     { section: 'Other' },
     { id:'recycleBin', icon:'🗑️', label:'Recycle Bin' },
+    { id:'exportData',  icon:'💾', label:'Export data.js' },
   ] : [
     { section: 'Learning' },
     { id:'myLectures', icon:'▶️', label:'My Lectures' },
@@ -368,7 +299,7 @@ function navigate(sec) {
   const el = document.getElementById('nav-' + sec);
   if (el) el.classList.add('active');
   STATE.section = sec;
-  const views = { dashboard, batches, students, lectures, myLectures, recycleBin };
+  const views = { dashboard, batches, students, lectures, myLectures, recycleBin, exportData };
   if (views[sec]) views[sec]();
 }
 
@@ -1054,6 +985,60 @@ function permDeleteLecture(id) {
   if (!confirm('Permanently delete? Cannot be undone.')) return;
   STATE.trash.lectures = STATE.trash.lectures.filter(l=>l.id!==id);
   toast('Permanently deleted'); recycleBin();
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║               ADMIN: EXPORT data.js                     ║
+// ╚══════════════════════════════════════════════════════════╝
+function exportData() {
+  const output = `// ================================================================
+//  data.js — Unacademy Gwalior Database
+//  Generated: ${new Date().toLocaleString()}
+//  Paste this entire file into data.js on GitHub and commit.
+// ================================================================
+
+const DB = {
+
+  batches: ${JSON.stringify(STATE.batches, null, 4)},
+
+  students: ${JSON.stringify(STATE.students, null, 4)},
+
+  lectures: ${JSON.stringify(STATE.lectures, null, 4)},
+
+};`;
+
+  setMain(`
+    <div class="page-header">
+      <div class="page-title">💾 Export data.js</div>
+      <div class="page-sub">Copy this and paste it into <strong>data.js</strong> on GitHub, then commit.</div>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="copyExport()">📋 Copy to Clipboard</button>
+        <a class="btn btn-success" id="dlBtn" download="data.js">⬇️ Download data.js</a>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+        📌 Steps: Copy → Go to GitHub → Open data.js → Click ✏️ Edit → Select All → Paste → Commit
+      </div>
+      <textarea id="exportBox" style="width:100%;height:420px;font-family:'JetBrains Mono',monospace;font-size:12px;padding:14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#0f172a;color:#e2e8f0;resize:vertical;line-height:1.6;"
+        readonly></textarea>
+    </div>
+  `);
+
+  const box = document.getElementById('exportBox');
+  box.value = output;
+
+  // Setup download link
+  const blob = new Blob([output], { type: 'text/javascript' });
+  document.getElementById('dlBtn').href = URL.createObjectURL(blob);
+}
+
+function copyExport() {
+  const box = document.getElementById('exportBox');
+  box.select();
+  document.execCommand('copy');
+  toast('Copied! Now paste into data.js on GitHub ✅', 's');
 }
 
 // ── Boot ──
