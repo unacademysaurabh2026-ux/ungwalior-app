@@ -60,7 +60,7 @@ const usingDemo = () => false; // data.js is always the source
 const esc       = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const batchName = id => (STATE.batches.find(b=>b.id===id)||{name:'—'}).name;
 const ytThumb   = id => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
-const ytEmbed   = id => `https://www.youtube.com/embed/${id}?autoplay=1`;
+const ytEmbed   = id => `https://www.youtube.com/embed/${id}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3`;
 const today     = () => new Date().toISOString().slice(0,10);
 const uid       = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const setMain   = html => document.getElementById('mainArea').innerHTML = html;
