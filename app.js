@@ -160,19 +160,31 @@ async function loadAllData() {
 async function writeToSheet(action, data) {
   if (usingDemo()) return { success: true };
   try {
-    const payload = JSON.stringify({ action, ...data });
-    await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method : 'POST',
-      mode   : 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body   : payload,
-    });
-    return { success: true };
+    // Use GET with URL params — works cross-origin, response is readable
+    // (no-cors POST is fire-and-forget and can't tell us if it failed)
+    const params = new URLSearchParams({ action, ...flattenForUrl(data) });
+    const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+    const resp = await fetch(url, { method: 'GET' });
+    const result = await resp.json();
+    if (!result.success) {
+      console.error('Sheet write failed:', action, result);
+      toast('\u26a0\ufe0f Sheet sync error: ' + (result.error || 'unknown'), 'e');
+    }
+    return result;
   } catch (e) {
-    console.error('writeToSheet error:', e);
-    toast('⚠️ Could not sync to Google Sheets', 'e');
+    console.error('writeToSheet error:', action, e);
+    toast('\u26a0\ufe0f Could not sync to Google Sheets. Check Apps Script.', 'e');
     return { success: false };
   }
+}
+
+// Flatten object values to strings for URL params
+function flattenForUrl(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = (v === null || v === undefined) ? '' : String(v);
+  }
+  return out;
 }
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -221,10 +233,24 @@ async function studentLogin() {
   btn.disabled = true; btn.textContent = 'Logging in...';
 
   try {
-    // ── Use Apps Script GET for live login (bypasses stale published CSV) ──
-    // Published CSV can be 5-10 minutes stale; Apps Script always reads live data.
-    // doGet with query params works cross-origin without CORS issues.
-    const result = await liveLogin(emailVal, password);
+    // Use Apps Script GET for live login — bypasses stale published CSV entirely
+    const params = new URLSearchParams({ action: 'loginByEmail', email: emailVal, password });
+    const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+
+    let result;
+    try {
+      const resp = await fetch(url, { method: 'GET' });
+      result = await resp.json();
+    } catch(netErr) {
+      // Network error — fall back to CSV
+      console.warn('Apps Script unreachable, falling back to CSV:', netErr);
+      await loadAllData();
+      const s = STATE.students.find(st => (st.email||'').toLowerCase() === emailVal);
+      if (!s) result = { success: false, message: 'No account found with that email' };
+      else if (String(s.password).trim() !== password) result = { success: false, message: 'Incorrect password' };
+      else if (!isActive(s)) result = { success: false, message: 'Your account is inactive. Contact admin.' };
+      else result = { success: true, name: s.name, email: s.email, batchId: s.batchId };
+    }
 
     if (!result.success) {
       toast(result.message || 'Login failed', 'e');
@@ -232,57 +258,15 @@ async function studentLogin() {
       return;
     }
 
-    // Login succeeded — load all data for the app, then launch
     await loadAllData();
-    STATE.user = {
-      name    : result.name,
-      email   : emailVal,
-      role    : 'student',
-      batchId : result.batchId,
-    };
+    STATE.user = { name: result.name, email: emailVal, role: 'student', batchId: result.batchId };
     localStorage.setItem('userSession', JSON.stringify(STATE.user));
     btn.disabled = false; btn.textContent = 'Login →';
     launchApp();
   } catch(err) {
     console.error('Login error:', err);
-    toast('Login failed. Check your connection.', 'e');
+    toast('Login failed. Try again.', 'e');
     btn.disabled = false; btn.textContent = 'Login →';
-  }
-}
-
-// ── Live login via Apps Script GET (no CORS issues, always reads fresh sheet data) ──
-async function liveLogin(email, password) {
-  if (usingDemo()) {
-    // Demo mode: check against DEMO data
-    const s = DEMO.students.find(s => s.email.toLowerCase() === email);
-    if (!s) return { success: false, message: 'No account found with that email' };
-    if (s.password !== password) return { success: false, message: 'Incorrect password' };
-    if (!isActive(s)) return { success: false, message: 'Your account is inactive. Contact admin.' };
-    return { success: true, name: s.name, batchId: s.batchId };
-  }
-
-  // Encode params and call Apps Script as GET request
-  // doGet in the Apps Script must handle action=loginByEmail
-  const params = new URLSearchParams({
-    action  : 'loginByEmail',
-    email   : email,
-    password: password,
-  });
-  const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
-
-  try {
-    const resp = await fetch(url, { method: 'GET' });
-    const data = await resp.json();
-    return data; // { success, message, name, batchId }
-  } catch(e) {
-    // Network error — fall back to CSV (may be stale but better than nothing)
-    console.warn('Apps Script unreachable, falling back to CSV:', e);
-    await loadAllData();
-    const s = STATE.students.find(st => (st.email||'').toLowerCase() === email);
-    if (!s) return { success: false, message: 'No account found with that email' };
-    if (String(s.password).trim() !== password) return { success: false, message: 'Incorrect password' };
-    if (!isActive(s)) return { success: false, message: 'Your account is inactive. Contact admin.' };
-    return { success: true, name: s.name, batchId: s.batchId };
   }
 }
 
