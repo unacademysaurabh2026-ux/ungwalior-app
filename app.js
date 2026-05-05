@@ -121,10 +121,23 @@ async function fetchSheet(url) {
 }
 
 async function loadAllData() {
-  // Load from data.js (DB global) — always fresh, no network needed
-  STATE.batches  = (DB.batches  || []).map(b => ({...b}));
-  STATE.students = (DB.students || []).map(s => ({...s}));
-  STATE.lectures = (DB.lectures || []).map(l => ({...l}));
+  // Fetch data.js fresh with cache-busting to bypass mobile/PWA cache
+  try {
+    const v = Date.now();
+    const resp = await fetch('data.js?v=' + v, { cache: 'no-store' });
+    const text = await resp.text();
+    // Execute the fetched data.js to get fresh DB
+    const fn = new Function(text + '; return DB;');
+    const freshDB = fn();
+    STATE.batches  = (freshDB.batches  || []).map(b => ({...b}));
+    STATE.students = (freshDB.students || []).map(s => ({...s}));
+    STATE.lectures = (freshDB.lectures || []).map(l => ({...l}));
+  } catch(e) {
+    // Fallback to already-loaded DB global
+    STATE.batches  = (DB.batches  || []).map(b => ({...b}));
+    STATE.students = (DB.students || []).map(s => ({...s}));
+    STATE.lectures = (DB.lectures || []).map(l => ({...l}));
+  }
 }
 
 // writeToSheet is a no-op — data lives in data.js on GitHub
