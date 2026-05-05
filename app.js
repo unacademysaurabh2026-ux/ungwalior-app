@@ -214,73 +214,75 @@ function showStep(id) {
 
 async function studentLogin() {
   const emailVal = document.getElementById('emailInput').value.trim().toLowerCase();
-  const password = document.getElementById('passInput').value;
+  const password = document.getElementById('passInput').value.trim();
   const btn      = document.getElementById('studentLoginBtn');
 
   if (!emailVal || !password) { toast('Enter email and password', 'e'); return; }
   btn.disabled = true; btn.textContent = 'Logging in...';
 
   try {
+    // ── Use Apps Script GET for live login (bypasses stale published CSV) ──
+    // Published CSV can be 5-10 minutes stale; Apps Script always reads live data.
+    // doGet with query params works cross-origin without CORS issues.
+    const result = await liveLogin(emailVal, password);
+
+    if (!result.success) {
+      toast(result.message || 'Login failed', 'e');
+      btn.disabled = false; btn.textContent = 'Login →';
+      return;
+    }
+
+    // Login succeeded — load all data for the app, then launch
     await loadAllData();
-
-    // Debug: log how many students loaded
-    console.log('Students loaded:', STATE.students.length, STATE.students.map(s => s.email));
-
-    // Find student by email
-    const student = STATE.students.find(s => (s.email || '').toLowerCase() === emailVal);
-
-    if (!student) {
-      toast('No account found with that email', 'e');
-      btn.disabled = false; btn.textContent = 'Login →'; return;
-    }
-
-    // Check password (compare as strings, trim whitespace)
-    if (String(student.password).trim() !== String(password).trim()) {
-      toast('Incorrect password', 'e');
-      btn.disabled = false; btn.textContent = 'Login →'; return;
-    }
-
-    // Check active status from CSV (with localStorage overrides already applied)
-    // Skip the CORS Apps Script call — it fails from static hosting (GitHub Pages)
-    if (!isActive(student)) {
-      toast('Your account is inactive. Contact admin.', 'e');
-      btn.disabled = false; btn.textContent = 'Login →'; return;
-    }
-
-    STATE.user = { name: student.name, email: student.email, role: 'student', batchId: student.batchId };
+    STATE.user = {
+      name    : result.name,
+      email   : emailVal,
+      role    : 'student',
+      batchId : result.batchId,
+    };
     localStorage.setItem('userSession', JSON.stringify(STATE.user));
     btn.disabled = false; btn.textContent = 'Login →';
     launchApp();
   } catch(err) {
     console.error('Login error:', err);
-    toast('Login failed. Try again.', 'e');
+    toast('Login failed. Check your connection.', 'e');
     btn.disabled = false; btn.textContent = 'Login →';
   }
 }
 
-// Calls Apps Script loginStudent which reads LIVE sheet data (not cached CSV)
-async function fetchLiveStudentStatus(id, password) {
-  if (usingDemo()) return { active: true };
+// ── Live login via Apps Script GET (no CORS issues, always reads fresh sheet data) ──
+async function liveLogin(email, password) {
+  if (usingDemo()) {
+    // Demo mode: check against DEMO data
+    const s = DEMO.students.find(s => s.email.toLowerCase() === email);
+    if (!s) return { success: false, message: 'No account found with that email' };
+    if (s.password !== password) return { success: false, message: 'Incorrect password' };
+    if (!isActive(s)) return { success: false, message: 'Your account is inactive. Contact admin.' };
+    return { success: true, name: s.name, batchId: s.batchId };
+  }
+
+  // Encode params and call Apps Script as GET request
+  // doGet in the Apps Script must handle action=loginByEmail
+  const params = new URLSearchParams({
+    action  : 'loginByEmail',
+    email   : email,
+    password: password,
+  });
+  const url = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+
   try {
-    const blob = new Blob(
-      [JSON.stringify({ action: 'loginStudent', id, password })],
-      { type: 'text/plain' }
-    );
-    // sendBeacon is fire-and-forget so we can't use it here.
-    // For login we need the response — use fetch with no-cors fallback.
-    // Since we need to READ the response, we try cors first.
-    const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'loginStudent', id, password }),
-    });
+    const resp = await fetch(url, { method: 'GET' });
     const data = await resp.json();
-    return { active: data.success === true };
+    return data; // { success, message, name, batchId }
   } catch(e) {
-    // If cors fails (e.g. network), fall back to CSV active value
-    const student = STATE.students.find(s => String(s.id) === String(id));
-    return { active: student ? isActive(student) : false };
+    // Network error — fall back to CSV (may be stale but better than nothing)
+    console.warn('Apps Script unreachable, falling back to CSV:', e);
+    await loadAllData();
+    const s = STATE.students.find(st => (st.email||'').toLowerCase() === email);
+    if (!s) return { success: false, message: 'No account found with that email' };
+    if (String(s.password).trim() !== password) return { success: false, message: 'Incorrect password' };
+    if (!isActive(s)) return { success: false, message: 'Your account is inactive. Contact admin.' };
+    return { success: true, name: s.name, batchId: s.batchId };
   }
 }
 
