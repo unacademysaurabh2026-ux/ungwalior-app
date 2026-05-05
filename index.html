@@ -104,12 +104,11 @@
       <div class="modal-title" id="vModalTitle"></div>
       <button class="modal-x" onclick="closeVideo()">×</button>
     </div>
-    <div class="embed"><iframe id="vFrame" allowfullscreen allow="autoplay;encrypted-media"></iframe></div>
+    <div class="embed"><div class="embed-mask top"></div><iframe id="vFrame" allowfullscreen allow="autoplay;encrypted-media"></iframe><div class="embed-mask bottom"></div></div>
     <div class="modal-foot" id="vModalMeta"></div>
   </div>
 </div>
 
-<script src="data.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
