@@ -237,6 +237,30 @@ async function checkStoredLogin() {
     try {
       STATE.user = JSON.parse(stored);
       await loadAllData();
+
+      if (STATE.user.role === 'student') {
+        // 1. Check student still exists in DB
+        const s = STATE.students.find(st => st.email === STATE.user.email);
+        if (!s) {
+          localStorage.removeItem('userSession');
+          return;
+        }
+        // 2. Check student is still active
+        if (!isActive(s)) {
+          localStorage.removeItem('userSession');
+          return;
+        }
+        // 3. Check student's batch still exists
+        const batch = STATE.batches.find(b => b.id === s.batchId);
+        if (!batch) {
+          localStorage.removeItem('userSession');
+          return;
+        }
+        // Update session with latest data from DB
+        STATE.user.name    = s.name;
+        STATE.user.batchId = s.batchId;
+      }
+
       launchApp();
     } catch(e) {
       localStorage.removeItem('userSession');
