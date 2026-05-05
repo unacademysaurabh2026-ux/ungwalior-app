@@ -223,23 +223,26 @@ async function studentLogin() {
   try {
     await loadAllData();
 
-    // First find student by email in CSV (for name/batchId)
-    const student = STATE.students.find(s => s.email.toLowerCase() === emailVal);
+    // Debug: log how many students loaded
+    console.log('Students loaded:', STATE.students.length, STATE.students.map(s => s.email));
+
+    // Find student by email
+    const student = STATE.students.find(s => (s.email || '').toLowerCase() === emailVal);
 
     if (!student) {
       toast('No account found with that email', 'e');
       btn.disabled = false; btn.textContent = 'Login →'; return;
     }
-    if (student.password !== password) {
+
+    // Check password (compare as strings, trim whitespace)
+    if (String(student.password).trim() !== String(password).trim()) {
       toast('Incorrect password', 'e');
       btn.disabled = false; btn.textContent = 'Login →'; return;
     }
 
-    // ── Check active status via Apps Script (live sheet, not cached CSV) ──
-    // The published CSV can be stale for minutes after admin deactivates a student.
-    // Apps Script reads the sheet directly so it's always up to date.
-    const liveCheck = await fetchLiveStudentStatus(student.id, password);
-    if (!liveCheck.active) {
+    // Check active status from CSV (with localStorage overrides already applied)
+    // Skip the CORS Apps Script call — it fails from static hosting (GitHub Pages)
+    if (!isActive(student)) {
       toast('Your account is inactive. Contact admin.', 'e');
       btn.disabled = false; btn.textContent = 'Login →'; return;
     }
@@ -249,6 +252,7 @@ async function studentLogin() {
     btn.disabled = false; btn.textContent = 'Login →';
     launchApp();
   } catch(err) {
+    console.error('Login error:', err);
     toast('Login failed. Try again.', 'e');
     btn.disabled = false; btn.textContent = 'Login →';
   }
