@@ -18,7 +18,7 @@ const DB = {
         "id": "mosfnuzrgm7k",
         "name": "saurabh",
         "email": "saurabh@gmail.com",
-        "batchId": "",
+        "batchId": "mosfne5mfva3",
         "active": "true",
         "password": "123"
     }
