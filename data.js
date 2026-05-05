@@ -1,21 +1,38 @@
 // ================================================================
 //  data.js — Unacademy Gwalior Database
-//  Edit this file directly on GitHub to add/remove/change data
-//  OR use Admin Panel → 💾 Export data.js → copy & paste here
+//  Generated: 05/05/2026, 17:45:09
+//  Paste this entire file into data.js on GitHub and commit.
 // ================================================================
 
 const DB = {
 
   batches: [
-    // { id:'b_xxx', name:'JEE Mains 2026' },
-  ],
+    {
+        "id": "moslc5mhl5rd",
+        "name": "IIT-JEE Excel-1 (Morning)"
+    }
+],
 
   students: [
-    // { id:'s_xxx', name:'Anjali', email:'anjali@gmail.com', password:'123', batchId:'b_xxx', active:'true' },
-  ],
+    {
+        "id": "moslcfypmug1",
+        "name": "saurabh",
+        "email": "saurabh@gmail.com",
+        "batchId": "moslc5mhl5rd",
+        "active": "true",
+        "password": "123"
+    }
+],
 
   lectures: [
-    // { id:'l_xxx', title:'Electric Charges', subject:'Physics', ytId:'oROKtbRr8R0', batchId:'b_xxx', date:'2026-05-05' },
-  ],
+    {
+        "id": "moslcql4l2qd",
+        "title": "demo",
+        "subject": "demo",
+        "ytId": "uK7Ovgs44Uk",
+        "batchId": "moslc5mhl5rd",
+        "date": "2026-05-05"
+    }
+],
 
 };
