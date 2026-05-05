@@ -19,7 +19,7 @@ const DB = {
         "name": "saurabh",
         "email": "saurabh@gmail.com",
         "batchId": "mosfne5mfva3",
-        "active": "false",
+        "active": "true",
         "password": "123"
     }
 ],
