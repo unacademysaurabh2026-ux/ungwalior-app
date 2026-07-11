@@ -6,7 +6,7 @@
 // ─── Hardcoded SMS Gateway Devices ───────────────────────────
 // Edit this list to add/remove devices — changes here apply on all devices
 const HARDCODED_SMS_DEVICES = [
-  // { url: "http://192.168.1.100:8080", user: "admin", pass: "password", label: "Device 1 - BSNL SIM 1" },
+  // { url: "https://sms-proxy.unacademysaurabh2026.workers.dev/", user: "X910GU", pass: "mukul@unacademy", label: "Mukul" },
   // { url: "http://192.168.1.101:8080", user: "admin", pass: "password", label: "Device 2 - BSNL SIM 2" },
   // { url: "http://192.168.1.102:8080", user: "admin", pass: "password", label: "Device 3 - BSNL SIM 3" },
   // Uncomment and fill in your actual device details above
